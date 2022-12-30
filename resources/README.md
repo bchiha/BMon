@@ -7,3 +7,4 @@ This directory contains resources that can be used on the TEC-1F with BMON.
 - Music for the Play Tune program `0x1D60` or `Shift-D`.  Load using Intel Hex Loader or SIO-In for binary file.  Set Start Address of tune at `0x3F9A`
 - A Special message for the ASCII Scroll Program.  Load at `0x2000` and Press `Shift-0` then select `Banner` from the menu and enter `2000` as the start address. 
 - JMON Notes with a bit more detail on some of its features.
+- [transfer_tool](transfer_tool/) contains a c++ file that can be used to quickly send binary / Intel HEX files to the TEC without the use of a Terminal program.
