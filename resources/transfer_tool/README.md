@@ -32,4 +32,6 @@ Arguments:
 ```
 
 ## Installation
+Type ` $ make all`.  That should be it.  The Makefile might need to be edited to use current c++ compiler on your computer.  The executable file `bin2tec` will be created.
+
 If you would like to use this program from any directory on your computer.  Copy the executable to ` /usr/local/bin`.  This directory should be in your PATH.
