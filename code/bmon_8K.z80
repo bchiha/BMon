@@ -159,6 +159,7 @@ PATCH_BEF:  EQU     3F4BH                               ;PRE-SCAN USER PATCH
 PATCH_DUR:  EQU     3F4EH                               ;USER "DURING LOOP" PATCH
 PATCH_AFT:  EQU     3F51H                               ;USER "AFTER KEY" PATCH
 PATCH_KEY:  EQU     3F54H                               ;USER "KEYBOARD" PATCH
+RST_FLAG:   EQU     3F57H                               ;RESET FLAG
 STEP_NEXT:  EQU     3F58H                               ;ADDRESS OF INSTRUCTION JUST STEPPED
 STEP_CREG:  EQU     3F5AH                               ;CURRENT REG No. BUFFER
 RE_ENTRY:   EQU     3F60H                               ;RE-ENTRY ADDRESS BUFFER
@@ -173,7 +174,7 @@ PERI_W_ADD: EQU     3F84H                               ;PERIMITER WINDOW ENTRY 
 PERI_W_CUR: EQU     3F86H                               ;CURRENT PERIMETER WINDOW
 PERI_W_MAX: EQU     3F87H                               ;TOTAL PERIMETER WINDOWS
 PERI_J_ADR: EQU     3F88H                               ;PERIMITER GO JUMP ADDRESS
-PERI_W_AC1: EQU     3F8CH                               ;PERIMITER ACTIVE WINDOW + 1
+PERI_W_AC1: EQU     3F8AH                               ;PERIMITER ACTIVE WINDOW + 1
 MENU_SETUP: EQU     3F8DH                               ;MENU SETUP START
 MENU_NO:    EQU     3F8FH                               ;MENU ENTRY NUMBER
 MENU_J_TBL: EQU     3F91H                               ;MENU JUMP TABLE
@@ -183,21 +184,17 @@ MENU_KEYRN: EQU     3F97H                               ;MENU DATA KEY RETURN HA
 SIO_START:  EQU     3F98H                               ;START OF SIO TRANSFER ADDRESS
 SIO_END:    EQU     3F9AH                               ;SEND OF SIO TRANSFER ADDRESS
 
-BAUD:       EQU     3FA4H                               ;BAUD RATE DELAY FOR SIO
-HEX_ADDR:   EQU     3FA6H                               ;INTEL HEX START ADDRESS
-HEX_CHKSUM: EQU     3FA8H                               ;INTEL HEX CHECKSUM
-PATCH_REQ:  EQU     3FB0H                               ;RESET PATCH REQUIRED IF 0xAA IS HERE
-PATCH_STA:  EQU     3FB1H                               ;RESET PATCH START ADDRESS. 0x3FB1-0x3FB2
-PATCH_VAR:  EQU     3FB3H                               ;RESET PATCH VARIABLE.  0X3FB4 Size of Patch
-PATCH_CHK:  EQU     3FB5h                               ;RESET PATCH CHECKSUM
-PATCH_ADR:  EQU     3FB6H                               ;RESET PATCH ADDRESS. 0x3FB6-0x3FB7
-USER_TBL:   EQU     3FC0H - 2                           ;User Table -2
-RST_FLAG:   EQU     3FFFH                               ;Reset Flag
-JMON_DISS:  EQU     4000H                               ;JMON DISSASEMBLER ADDRESS START LOCATION 
-JMON_JUMP:  EQU     381EH                               ;START OF THE JUMP TABLE IN THE JMON UTILITIES
+; FREE RAM BETWEEN 3FA0 - 3FDF
+
+USER_TBL:   EQU     3FE0H - 2                           ;User Table -2
+BMON_XROM:  EQU     4000H                               ;BMON EXPANSION ROM ADDRESS START LOCATION 
+BMON_XINI:  EQU     57F0H                               ;BMOM EXPANSION INITIALISATION ENTRY
+BMON_XJMP:  EQU     5D00H                               ;START OF THE JUMP TABLE IN THE BMON EXPANSION
+BMON_STEP:  EQU     59B0H                               ;START OF LCD STEPPER DISPLAY ON THE BMON EXPANSION
 J_MINT:     EQU     0800H                               ;MINT LOCATION FOR BMON
 J_BASIC:    EQU     1000H                               ;TINY BASIC LOCATION FOR BMON
 J_GAMES:    EQU     18E0H                               ;GAMES LOCATION FOR BMON
+J_XROM:     EQU     5F70H                               ;EXPANSION ROM MENU   
 PLAY_TUNE:  EQU     1D60H                               ;TUNE ROUTINE
 
 ;IO Port ASSIGNMENTS
@@ -321,7 +318,6 @@ MON_START:  IM      1                                   ;SET INTERRUPT MODE 1 FO
 
 ;RE-ENTRY POINT AFTER SAVING REGISTERS
 MON_START2: LD      SP, V_KEY                           ;SET STACK (to the Keyboard Buffer??)
-            ;CALL    RST_PATCH                           ;CALL RESET PATCH HANDLER
             NOP
             NOP
             RST     20H                                 ;LOOK FOR FORCED HARD RESET
@@ -345,15 +341,14 @@ L0095:      LD      (DE), A                             ;LOCATION OF EACH
             INC     DE                                  ;
             DJNZ    L0095                               ;
             CALL    LCD_RESET                           ;INITIALIZE/TEST FOR THE LCD
-            LD      A, 0xAA
-           ; XOR     A                                   ;CLEAR HARD/SOFT
+            LD      A, 0xAA                             ;SOFT RESET ON DEFAULT
             LD      (RST_FLAG), A                       ;RESET FLAG
 
 ;THIS SECTION IS THE SOFT RESET SECTION. IT IS ALSO PART OF THE HARD RESET SECTION.
-SOFT_RST:   LD      HL, JMON_DISS                       ;TEST FOR JMON DISASSEBLER ROM
+SOFT_RST:   LD      HL, BMON_XROM+1                     ;TEST FOR BMON EXPANSION ROM
             LD      A, (HL)
-            CP      0x21                                ;AND CALL ITS RESET ROUTINE
-            CALL    Z, JMON_DISS                        ;IF REQUIRED
+            CP      0xB7                                ;AND CALL ITS RESET ROUTINE
+            CALL    Z, BMON_XINI                        ;IF REQUIRED
             CALL    BEEPBEEP                            ;CALL RESET TONE ROUTINE (BEEP BEEP)
 FN_S_RST:   XOR     A                                   ;CLEAR MONITOR CONTROL BYTE
             LD      (V_MCB), A                          ;0 = DATA MODE, NO NIBBLES ENTERED
@@ -503,7 +498,7 @@ KEY_FUNC:   LD      A, B                                ;PUT MONITOR CONTROL BYT
                                                         ;*** Value is 3FBE as User Table is at 3FC0
             CP      0x04                                ;TEST FOR FUNCTION 2
             JR      Z, L0162                            ;JUMP IF FUNCTION 2 (USER FUNCTION)
-            LD      HL, JMON_JUMP                       ;OTHERWISE MUST BE FUNCTION 3
+            LD      HL, BMON_XJMP -2                    ;OTHERWISE MUST BE FUNCTION 3
 L0162:      LD      A, (V_KEY)                          ;GET INPUT KEY FROM INPUT BUFFER
             INC     A                                   ;ADD ONE IN CASE IT WAS ZERO
             LD      B, A                                ;PUT IN B TO USE AS A LOOP COUNTER
@@ -689,7 +684,7 @@ J_LCD:
             LD      A, (V_LCD)                          ;TEST LCD MASK
             OR      A
             RET     NZ                                  ;NOT ZERO = LCD NOT REQUIRED OR FITTED
-            LD      A, 0x80                             ;SET LCD CURSOR TO HOME
+            LD      A, 0x01                             ;SET LCD CURSOR TO CLEAR & HOME
             OUT     (P_LCDINST), A
             RST     30H                                 ;WAIT UNTIL LCD READY
             CALL    LCD_LINE1                           ;CALL SET-UP AND OUTPUT FIRST LINE
@@ -833,32 +828,8 @@ FN_FORW8:   LD      DE, 0x0008                          ;DE= +8
 FN_BACK8:   LD      DE, 0xFFF8                          ;DE= -8
             JR      L02D6                               ;JUMP TO ADD
 
-;RESET PATCH CHECKER.
-;TESTS FOR PATCH REQUIREMENT AND UP TO THE FIRST 256 BYTES OF THE PATCH ROUTINE. THE
-;CHECKSUM FEATURE ENSURES A WAY TO CHECK THAT THE PATCH OR PATCH VARIABLES HAVE NOT BEEN
-;CORRUPTED BY A SYSTEM CRASH, OTHERWISE YOU MAY NEVER REGAIN CONTROL OF THE COMPUTER UNLESS
-;YOU TURN IT OFF, (AND LOSE THE CONTENTS OF YOUR MEMORY - YOU CANNOT RECOVER IT BY A FORCED
-;HARD RESET AS THE USER PATCH IS EXECUTED BEFORE THE FORCED HARD RESET TEST). (A FORCED
-;HARD RESET IS WHEN A KEY IS HELD DOWN WHEN THE RESET KEY IS RELEASED).
-;IF YOU HAVE A NON VOLATILE MEMORY AT 2000 THE SITUATION WOULD BE ABSOLUTELY HOPELESS
-;WITHOUT THIS CHECKER ROUTINE.
-;A VARIABLE CAN BE PASSED TO YOUR PATCH ROUTINE IN THE "C" REGISTER. TO DO THIS THE VARIABLE
-;IS PLACED AT ADDRESS LOCATION 3FB3.
+            DB      0xFF, 0xFF, 0xFF, 0xFF ;FILL
 
-RST_PATCH:  LD      A, (PATCH_REQ)                      ;TEST FOR RESET PATCH REQUIRED
-            CP      0xAA
-            RET     NZ                                  ;RETURN IF NOT
-            LD      BC, (PATCH_VAR)                     ;PUT NO OF BYTES IN B VARIABLE IN C
-            LD      HL, (PATCH_STA)                     ;START IN HL
-            XOR     A                                   ;CLEAR A
-L0305:      ADD     A, (HL)                             ;ADD CHECKSUM
-            INC     HL
-            DJNZ    L0305                               ;UNTIL B=0
-            LD      HL, PATCH_CHK                       ;POINT TO REQUIRED CHECKSUM
-            CP      (HL)                                ;TEST FOR EQUAL
-            RET     NZ                                  ;ABORT IF NOT
-            LD      HL, (PATCH_ADR)                     ;ELSE GET START ADDR
-            JP      (HL)                                ;AND DO RESET PATCH
 
 ;STEPPER ROUTINE
 ;THE STEPPER ROUTINE IS BROKEN UP INTO SEVERAL SECTIONS. THE FIRST IS THE REGISTER SAVE,
@@ -905,6 +876,17 @@ STEP_CONT:  LD      HL, DISP_STEP                       ;CREATE NEW DISPLAY BUFF
             LD      (V_DISPLAY), HL                     ;
             DEC     SP                                  ;DECREASE SP BY 2 TO POINT TO THE
             DEC     SP                                  ;"PC" BUFFER
+
+;IF BMON XROM IS INSTALLED, CALL THE STEPPER LCD DISPLAY ROUTINE FOUND ON THE XROM HERE
+STEP_LCD:   LD      HL, BMON_XROM+1                     ;TEST FOR BMON EXPANSION ROM
+            LD      A, (HL)
+            CP      0xB7                                ;AND CALL ITS LCD STEPPER DISPLAY
+
+            JR      NZ,L034C
+            LD      (RE_ENTRY),SP                       ;SAVE STEP STACK
+            LD      SP,(STEP_SP)                        ;USE TEC STACK
+            CALL    BMON_STEP                           ;ROUTINE IF REQUIRED
+            LD      SP,(RE_ENTRY)                       ;CONTINUE WITH STEP STACK
 
 ;WHEN UP-DATING THE DISPLAY, THE ROUTINE MAY JUMP BACK TO HERE IF THE FIRST DISPLAY IS REQUIRED.
 L034C:      LD      A, 0x01                             ;SET UP FOR THE FIRST REGISTER (PC)
@@ -1141,10 +1123,7 @@ ORG     $0426
 ;GENERAL SIO TRANSMISION ENTRY POINT.  THIS ROUTINE WILL EXECUTE EITHER THE TRANSMIT OR RECEIVE SIO
 ;ROUTINE BASED ON THE MENU NUMBER.
 J_SIO_TRANS:
-            LD      HL, DEF_BAUD                        ;SET BAUD 4800
-            LD      (BAUD), HL                          ;SET UP THE BAUD RATE
-            
-;CONTINUE WITH PERIMETER SETUP FOR SIO
+            ;CONTINUE WITH PERIMETER SETUP FOR SIO
             LD      A, (MENU_NO)                        ;GET MENU ENTRY NUMBER
             OR      A                                   ;TEST FOR ZERO
             JR      Z, L0437                            ;SET FOR INPUT ROUTINE
@@ -1203,6 +1182,8 @@ SET_START_END:
 L0477:
             INC     DE                                  ;ADD ONE TO DE TO MAKE IT LARGER THAN HL
             RET
+
+            DB      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  ;FILL 
 
 ;PERIMETER HANDLER
 ;THE PERIMETER HANDLER ROUTINE IS SIMILAR TO THE MENU DRIVER. THE MAJOR DIFFERENCES ARELISTED BELOW:
@@ -1374,7 +1355,7 @@ TXCHAR:
             PUSH	AF                                  ;SAVE AF, BC AND HL
             PUSH	BC
             PUSH	HL
-            LD	    HL,(BAUD)                           ;HL HOLDS THE BIT TIME DELAY
+            LD	    HL, DEF_BAUD                        ;HL HOLDS THE BIT TIME DELAY
             LD	    C,A                                 ;SAVE BYTE TO TRANSMIT IN C
 
             XOR	    A                                   ;TRANSMIT THE START BIT
@@ -1413,7 +1394,7 @@ STARTBIT:
             JR	    NZ, STARTBIT                        ;NO START BIT YET
 
 ;START BIT DETECTED
-            LD	    HL, (BAUD)                          ;DELAY FOR HALF A
+            LD	    HL, DEF_BAUD                        ;DELAY FOR HALF A
             SRL	    H                                   ;BIT TIME TO SAMPLE THE MIDDLE
             RR	    L 	                                ;OF THE BIT CELL
             CALL	BITIME                              ;CALL BAUD DELAY
@@ -1424,7 +1405,7 @@ STARTBIT:
 ;VALID START BIT DETECTED
             LD	    B, 0x08                             ;RECEIVE EIGHT BITS
 GETBITS:	
-            LD	    HL, (BAUD)                          ;SET BAUD DELAY
+            LD	    HL, DEF_BAUD                        ;SET BAUD DELAY
             CALL	BITIME                              ;CALL BAUD DELAY
             IN	    A, (KEYBOARD)                       ;GET BIT
             RL    	A                                   ;PUT BIT 7 IN CARRY FLAG
@@ -1527,9 +1508,6 @@ SL4:
 ;01 FOR END OF FILE. DATA IS THE DATA OF UPTO 16 BYTES AND THE CHECKSUM IS THE ADDITION OF 
 ;ALL BYTES.
 J_INTEL_IN:
-            LD      HL, DEF_BAUD                        ;SET BAUD 4800
-            LD      (BAUD), HL                          ;SET UP THE BAUD RATE
-
             CALL    INTEL_LOADER                        ;CALL THE LOADER ROUTINE
             JP      NZ, INTEL_ERR                       ;IF RETURNS NON ZERO, ERROR
             LD      DE, LOAD_DA_P                       ;LOAD PASS
@@ -1608,6 +1586,8 @@ GET_NIBBLE:
 NOTA2F:
 	        AND	    0x0F                                ;MASK OUT HIGH NuBBLE AND CONVERT TO BINARY
             RET
+
+            DB      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  ;FILL 
 
 ;THIS ROUTINE SWITCHES BETWEEN THE STANDARD TEC KEYBOARD LAYOUT AND MARK JELIC'S ALTERNATE ONE.  IT
 ;CAN BE MODIFED TO SUIT YOUR OWN LAYOUT.  IT WORKS BY USING SETTING THE KEYBOARD PATCH IN THE KEYBOARD
@@ -1879,7 +1859,7 @@ ORG     $07E0
 L07E0:      DW      FN_MENU                             ;#0 MAIN MENU SETUP TO MENU DRIVER
             DW      FN_BACK1                            ;#1 MOVE ADDRESS BACK ONE LOCATION
             DW      FN_STEPPER                          ;#2 STEPPER ROUTINE
-            DW      0xFFFF                              ;#3 SPARE
+            DW      J_XROM                              ;#3 EXPANSION ROM MENU
             DW      FN_FORW4                            ;#4 MOVE ADDRESS FORWARD FOUR LOCATIONS
             DW      FN_S_RST                            ;#5 DO A SOFT RESET
             DW      FN_BACK4                            ;#6 MOVE ADDRESS BACK FOUR LOCATIONS

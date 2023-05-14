@@ -1,0 +1,17 @@
+; Setup for BMon Expansion Rom
+
+; Only needed is to set the PATCH_BEF jump at 3F4B with start
+; of LCD Disassembler entry point at 47C8
+
+PATCH_BEF:  EQU     3F4BH                               ;PRE-SCAN USER PATCH
+
+            ORG     57F0H 
+START:               
+            LD      DE,PATCH_BEF
+            LD      HL,DATA
+            LD      BC,0003H
+            LDIR
+            RET
+
+DATA:       DB      0C3H,0C8H,47H,0FFH
+

@@ -1,0 +1,20 @@
+;Build all Extensions
+
+incbin 'Disassembler.bin'              ;4000H
+incbin 'TEC_magazine_collection.bin'   ;4800H
+incbin 'TEC_invaders_mk2.bin'          ;5000H
+incbin 'TEC_maze.bin'                  ;5400H
+incbin 'XROM_entry.bin'                ;57F0H
+incbin 'Game_of_life.bin'              ;5800H
+incbin 'LCD_Stepper.bin'               ;59B0H
+incbin 'TEC_runner.bin'                ;5A70H
+incbin 'BMON_Jump.bin'                 ;5D00H
+incbin 'Fast_forward.bin'              ;5D20H
+incbin 'Magic_square.bin'              ;5DF0H
+incbin 'Banger.bin'                    ;5F40H
+incbin 'Menu_driver.bin'               ;5F70H
+
+
+            DB      "-SLARTIBARTFAST-" ;Fill to 8k
+
+            DB      " BMON XROM V1.0 "
